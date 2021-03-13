@@ -1,0 +1,368 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+
+      
+    "environments": {
+      "defaultValue": [
+        "Dev",
+        "QA",
+        "UAT",
+        "Preview"
+      ],
+      "type": "array",
+      "metadata": {
+        "description": "Array with the names for the environment slots"
+      },
+      "maxLength": 19
+    },
+
+
+
+
+      
+
+    
+      "storageAccountNamePrefix" : {
+            "type" : "string",
+            "defaultValue" : "Oluwaseun",
+            "minLength" : 3,
+            "maxLength" : 15,
+            "metadata" : {
+                "description" : "The storage account cannot be less than 3 chars or more than 15 chars"
+            }
+        },
+        "accountType" : {
+            "type" : "string",
+            "defaultValue" : "Standard_LRS",
+            "allowedValues" : [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_ZRS"
+            ]
+        },
+        "functionAppName" : {
+            "type" : "string",
+            "defaultValue" : "myFunction",
+            "minLength" : 5,
+            "maxLength" : 20,
+            "metadata" : {
+                "description" : "The function app name cannot be less than 5 chars or more than 20 chars"
+            }
+        },        
+        "applicationInsightsName" : {
+            "type" : "string",
+            "defaultValue" : "myAppInsight",
+            "minLength" : 5,
+            "maxLength" : 20,
+            "metadata" : {
+                "description" : "The app insight name cannot be less than 5 chars or more than 20 chars"
+            }
+        },
+        "webAppNameInput": {
+          "type": "string",
+          "defaultValue": "myWebApp",
+          "minLength": 3,
+          "maxLength": 20,
+          "metadata": {
+            "description": "The webAppNameInput cannot be less thatn 3 chars or more that 20 chars"
+          }
+         
+        }
+        ,
+          
+          
+    "minimumCapacity": {
+      "type": "Int",
+      "defaultValue": 2,
+      "metadata": {
+        "description": "The minimum capacity.  Autoscale engine will ensure the instance count is at least this value."
+      }
+    },
+    "maximumCapacity": {
+      "type": "Int",
+      "defaultValue": 9,
+      "metadata": {
+        "description": "The maximum capacity.  Autoscale engine will ensure the instance count is not greater than this value."
+      }
+    },
+    "defaultCapacity": {
+      "type": "Int",
+      "defaultValue": 5,
+      "metadata": {
+        "description": "The default capacity.  Autoscale engine will preventively set the instance count to be this value if it can not find any metric data."
+      }
+    },
+    "metricName": {
+      "type": "string",
+      "defaultValue": "CpuPercentage",
+      "metadata": {
+        "description": "The metric name."
+      }
+    },
+    "metricThresholdToScaleOut": {
+      "type": "Int",
+      "defaultValue": 60,
+      "metadata": {
+        "description": "The metric upper threshold.  If the metric value is above this threshold then autoscale engine will initiate scale out action."
+      }
+    },
+    "metricThresholdToScaleIn": {
+      "type": "Int",
+      "defaultValue": 20,
+      "metadata": {
+        "description": "The metric lower threshold.  If the metric value is below this threshold then autoscale engine will initiate scale in action."
+      }
+    },
+    "changePercentScaleOut": {
+      "type": "Int",
+      "defaultValue": 5,
+      "metadata": {
+        "description": "The percentage to increase the instance count when autoscale engine is initiating scale out action."
+      }
+    },
+    "changePercentScaleIn": {
+      "type": "Int",
+      "defaultValue": 2,
+      "metadata": {
+        "description": "The percentage to decrease the instance count when autoscale engine is initiating scale in action."
+      }
+    },
+    "autoscaleEnabled": {
+      "type": "Bool",
+      "metadata": {
+        "description": "A boolean to indicate whether the autoscale policy is enabled or disabled."
+      }
+    }
+        
+
+
+    },
+
+    "functions": [],
+    "variables": {
+      
+      "storageAccountNameSuffix": "[toLower(concat(parameters('storageAccountNamePrefix'), uniqueString(resourceGroup().id)))]",
+        "appServicePlanName": "[concat(parameters('storageAccountNamePrefix'), '-ASP')]",
+        "functionAppNameAppend": "[toLower(concat(parameters('functionAppName'), uniqueString(resourceGroup().id)))]",
+        "applicationInsightsNameAppend": "[toLower(concat(parameters('applicationInsightsName'), uniqueString(resourceGroup().id)))]",
+        "storageAccoundId": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountNameSuffix'))]",
+        "webAppName": "[concat(parameters('webAppNameInput'),uniqueString(resourceGroup().id))]",
+         "settingName": "[concat(toLower(variables('appServicePlanName')), '-setting')]",
+    "targetResourceId": "[resourceId('Microsoft.Web/serverFarms/', variables('appServicePlanName'))]"
+    
+  
+   
+        
+
+
+
+    },
+    "resources": [
+         {
+              "apiVersion": "2015-08-01",
+              "type": "Microsoft.Web/sites",
+              "name": "[variables('functionAppNameAppend')]",
+              "location": "[resourceGroup().location]",
+              "kind": "functionapp",
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms',variables('appServicePlanName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountNameSuffix'))]",
+                "[resourceId('Microsoft.Insights/components',variables('applicationInsightsNameAppend'))]"
+              ],
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                "siteConfig": {
+                  "appSettings": [
+                    {
+                      "name": "AzureWebJobsDashboard",
+                      "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountNameSuffix'), ';AccountKey=', listKeys(variables('storageAccoundId'),'2015-05-01-preview').key1)]"
+                    },
+                    {
+                      "name": "AzureWebJobsStorage",
+                      "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountNameSuffix'), ';AccountKey=', listKeys(variables('storageAccoundId'),'2015-05-01-preview').key1)]"
+                    },
+                    {
+                      "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+                      "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountNameSuffix'), ';AccountKey=', listKeys(variables('storageAccoundId'),'2015-05-01-preview').key1)]"
+                    },
+                    {
+                      "name": "WEBSITE_CONTENTSHARE",
+                      "value": "[toLower(variables('functionAppNameAppend'))]"
+                    },
+                    {
+                      "name": "FUNCTIONS_EXTENSION_VERSION",
+                      "value": "~2"
+                    },
+                    {
+                      "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+                      "value": "[reference(resourceId('microsoft.insights/components/', variables('applicationInsightsNameAppend')), '2015-05-01').InstrumentationKey]"
+                    },
+                    {
+                      "name": "FUNCTIONS_WORKER_RUNTIME",
+                      "value": "dotnet"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+                "name": "[variables('webAppName')]",
+                "type": "Microsoft.Web/sites",
+                "apiVersion": "2018-11-01",
+                "location": "[resourceGroup().location]",
+                "tags": {
+                    "[concat('hidden-related:', resourceGroup().id, '/providers/Microsoft.Web/serverfarms/appServicePlan1')]": "Resource",
+                    "displayName": "[variables('webAppName')]"
+                },
+                "dependsOn": [
+                    "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                    "[resourceId('Microsoft.Insights/components',variables('applicationInsightsNameAppend'))]",
+                     "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountNameSuffix'))]"
+                ],
+                "properties": {
+                    "name": "[variables('webAppName')]",
+                    "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+                }
+            },
+            
+            {
+     "apiVersion": "2018-11-01",
+      "type": "Microsoft.Web/sites/slots",
+      "name": "[concat(variables('webAppName'), '/', parameters('environments')[copyIndex()])]",
+      "kind": "app",
+      "location": "[resourceGroup().location]",
+      "comments": "web app slots",
+      "tags": {
+        "displayName": "WebAppSlots"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/Sites', variables('webAppName'))]"
+      ],
+      "copy": {
+        "name": "webPortalSlot",
+        "count": "[length(parameters('environments'))]"
+      }
+    }
+,
+
+            {
+                "name": "[variables('storageAccountNameSuffix')]",
+                "type": "Microsoft.Storage/storageAccounts",
+                "apiVersion": "2015-06-15",
+                "location": "[resourceGroup().location]",
+                "tags": {
+                    "displayName": "MyStorageaccount"
+                },
+                "properties": {
+                    "accountType": "[parameters('accountType')]"
+                }
+            },
+        
+         {
+            "name": "[variables('applicationInsightsNameAppend')]",
+            "type": "Microsoft.Insights/components",
+            "apiVersion": "2015-05-01",
+            "location": "[resourceGroup().location]",
+            "tags": {},
+            "kind": "web",
+            "properties": {
+                "Application_Type": "web",
+                "Flow_Type": "Bluefield",
+                "Request_Source": "rest"
+            }
+        },
+        {
+            "name": "[variables('appServicePlanName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "location": "[resourceGroup().location]",
+            "sku":{
+               "name": "S1",
+        "tier": "Standard",
+        "size": "S1",
+        "family": "S",
+        "capacity": 1
+            },
+            
+            "tags": {
+                "displayName": "[variables('appServicePlanName')]"
+            },
+            "properties": {
+                "name": "[variables('appServicePlanName')]"
+            }
+        },
+        {
+      "type": "Microsoft.Insights/autoscalesettings",
+      "name": "[variables('settingName')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+      ],
+      "apiVersion": "2014-04-01",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "profiles": [
+          {
+            "name": "DefaultAutoscaleProfile",
+            "capacity": {
+              "minimum": "[parameters('minimumCapacity')]",
+              "maximum": "[parameters('maximumCapacity')]",
+              "default": "[parameters('defaultCapacity')]"
+            },
+            "rules": [
+              {
+                "metricTrigger": {
+                  "metricName": "[parameters('metricName')]",
+                  "metricNamespace": "",
+                  "metricResourceUri": "[variables('targetResourceId')]",
+                  "timeGrain": "PT5M",
+                  "statistic": "Average",
+                  "timeWindow": "PT10M",
+                  "timeAggregation": "Average",
+                  "operator": "GreaterThan",
+                  "threshold": "[parameters('metricThresholdToScaleOut')]"
+                },
+                "scaleAction": {
+                  "direction": "Increase",
+                  "type": "ChangeCount",
+                  "value": "[parameters('changePercentScaleOut')]",
+                  "cooldown": "PT10M"
+                }
+              },
+              {
+                "metricTrigger": {
+                  "metricName": "[parameters('metricName')]",
+                  "metricNamespace": "",
+                  "metricResourceUri": "[variables('targetResourceId')]",
+                  "timeGrain": "PT5M",
+                  "statistic": "Average",
+                  "timeWindow": "PT10M",
+                  "timeAggregation": "Average",
+                  "operator": "LessThan",
+                  "threshold": "[parameters('metricThresholdToScaleIn')]"
+                },
+                "scaleAction": {
+                  "direction": "Decrease",
+                  "type": "ChangeCount",
+                  "value": "[parameters('changePercentScaleIn')]",
+                  "cooldown": "PT10M"
+                }
+              }
+            ]
+          }
+        ],
+        "enabled": "[parameters('autoscaleEnabled')]",
+        "targetResourceUri": "[variables('targetResourceId')]"
+      }
+    }
+       
+       
+             
+
+    ],
+    "outputs": {}
+}

@@ -1,0 +1,6 @@
+[submodule "function-tutorial"]
+	path = function-tutorial
+	url = C:/Program Files/Git/function-tutorial
+[submodule "deployment"]
+	path = deployment
+	url = C:/Program Files/Git/deployments

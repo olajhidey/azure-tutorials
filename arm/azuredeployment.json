@@ -1,0 +1,134 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storageAccountNamePrefix": {
+            "type": "string",
+            "defaultValue":"test123",
+            "minLength": 4,
+            "maxLength": 15,
+            "metadata": {
+                "description": "The storage account name - not less than 3 and not greater than 15"
+            }
+        },
+        "accountType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_ZRS"
+            ],
+            "metadata": {
+                "description": "description"
+            }
+        }
+    },
+    "functions": [],
+    "variables": {
+        "storageAccountNameSuffix": "[toLower(concat(parameters('storageAccountNamePrefix'), uniqueString(resourceGroup().id)))]",
+        "appServicePlanName": "[concat(parameters('storageAccountNamePrefix'), '-ASP')]",
+        "appFunctionName": "lemolama",
+        "storageAccoundId": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountNameSuffix'))]",
+        "applicationInsightName": "[toLower(concat(parameters('storageAccountNamePrefix'), uniqueString(resourceGroup().id)))]"
+    
+    },
+    "resources": [
+        {
+            "name": "[variables('storageAccountNameSuffix')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-06-01",
+            "tags": {
+                "displayName": "[variables('storageAccountNameSuffix')]"
+            },
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "accountType":"[parameters('accountType')]"  
+            },
+            "kind": "StorageV2",
+            "sku": {
+                "name": "[parameters('accountType')]",
+                "tier": "Standard"
+            }
+        },
+        {
+            "name": "[variables('appFunctionName')]",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "location": "[resourceGroup().location]",
+            "kind": "functionapp",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                "[variables('storageAccoundId')]",
+                "[resourceId('Microsoft.Insights/components', variables('applicationInsightName'))]"
+               
+            ],
+            "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "AzureWebJobsDashboard",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountNameSuffix'), ';AccountKey=', listKeys(variables('storageAccoundId'),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "AzureWebJobsStorage",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountNameSuffix'), ';AccountKey=', listKeys(variables('storageAccoundId'),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountNameSuffix'), ';AccountKey=', listKeys(variables('storageAccoundId'),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "WEBSITE_CONTENTSHARE",
+                            "value": "[variables('appFunctionName')]"
+                        },
+                        {
+                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                            "value": "~2"
+                        },
+                        {
+                            "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+                            "value": "[reference(resourceId('microsoft.insights/components/', variables('applicationInsightName')), '2015-05-01').InstrumentationKey]"
+                        },
+                        {
+                            "name": "FUNCTIONS_WORKER_RUNTIME",
+                            "value": "dotnet"
+                        }
+                    ]
+                }
+            }
+        }, 
+        {
+            "name": "[variables('applicationInsightName')]",
+            "type": "Microsoft.Insights/components",
+            "apiVersion": "2015-05-01",
+            "location": "[resourceGroup().location]",
+            "tags": {},
+            "kind": "web", 
+            "properties": {
+                "Application_Type": "web",
+                "Flow_Type": "Bluefield"
+            }
+
+        },
+
+        {
+            "name": "[variables('appServicePlanName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Y1",
+                "capacity": 1
+            },
+            "tags": {
+                "displayName": "appServicePlan1"
+            },
+            "properties": {
+                "name": "[variables('appServicePlanName')]"
+            }
+        }
+    ],
+    "outputs": {}
+}
